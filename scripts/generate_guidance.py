@@ -70,20 +70,20 @@ class MacSecurityRule():
 def ulify(elements):
     string = "\n"
     for s in elements:
-        string += "* " + str(s) + "\n"
+        string += f"* {str(s)}" + "\n"
     return string
 
 def group_ulify(elements):
     string = "\n * "
     for s in elements:
-        string += str(s) + ", "
+        string += f"{str(s)}, "
     return string[:-2]
 
 
 def group_ulify_comment(elements):
     string = "\n * "
     for s in elements:
-        string += str(s) + ", "
+        string += f"{str(s)}, "
     return string[:-2]
 
 
@@ -95,7 +95,7 @@ def get_check_code(check_yaml):
     #print check_string
     check_code = re.search('(?:----((?:.*?\r?\n?)*)----)+', check_string)
     #print(check_code.group(1).rstrip())
-    return(check_code.group(1).strip())
+    return check_code[1].strip()
 
 
 def quotify(fix_code):
@@ -108,7 +108,7 @@ def quotify(fix_code):
 def get_fix_code(fix_yaml):
     fix_string = fix_yaml.split("[source,bash]")[1]
     fix_code = re.search('(?:----((?:.*?\r?\n?)*)----)+', fix_string)
-    return(fix_code.group(1))
+    return fix_code[1]
 
 
 def format_mobileconfig_fix(mobileconfig):
@@ -126,7 +126,7 @@ def format_mobileconfig_fix(mobileconfig):
                 f"Create a configuration profile containing the following keys in the ({domain}) payload type:\n\n")
             rulefix = rulefix + "[source,xml]\n----\n"
             for item in settings.items():
-                rulefix = rulefix + (f"<key>{item[0]}</key>\n")
+                rulefix = f"{rulefix}<key>{item[0]}</key>\n"
 
                 if type(item[1]) == bool:
                     rulefix = rulefix + \
@@ -160,17 +160,10 @@ class PayloadDict:
     """
 
     def __init__(self, identifier, uuid=False, removal_allowed=False, description='', organization='', displayname=''):
-        self.data = {}
-        self.data['PayloadVersion'] = 1
+        self.data = {'PayloadVersion': 1}
         self.data['PayloadOrganization'] = organization
-        if uuid:
-            self.data['PayloadUUID'] = uuid
-        else:
-            self.data['PayloadUUID'] = makeNewUUID()
-        if removal_allowed:
-            self.data['PayloadRemovalDisallowed'] = False
-        else:
-            self.data['PayloadRemovalDisallowed'] = True
+        self.data['PayloadUUID'] = uuid or makeNewUUID()
+        self.data['PayloadRemovalDisallowed'] = not removal_allowed
         self.data['PayloadType'] = 'Configuration'
         self.data['PayloadScope'] = 'System'
         self.data['PayloadDescription'] = description
@@ -187,12 +180,13 @@ class PayloadDict:
         elements.
         """
         #description = "Configuration settings for the {} preference domain.".format(payload_type)
-        payload_dict = {}
+        payload_dict = {
+            'PayloadVersion': 1,
+            'PayloadUUID': makeNewUUID(),
+            'PayloadEnabled': True,
+        }
 
-        # Boilerplate
-        payload_dict['PayloadVersion'] = 1
-        payload_dict['PayloadUUID'] = makeNewUUID()
-        payload_dict['PayloadEnabled'] = True
+
         payload_dict['PayloadType'] = payload_content_dict['PayloadType']
         payload_dict['PayloadIdentifier'] = f"alacarte.macOS.{baseline_name}.{payload_dict['PayloadUUID']}"
 
@@ -206,12 +200,13 @@ class PayloadDict:
         elements.
         """
         #description = "Configuration settings for the {} preference domain.".format(payload_type)
-        payload_dict = {}
+        payload_dict = {
+            'PayloadVersion': 1,
+            'PayloadUUID': makeNewUUID(),
+            'PayloadEnabled': True,
+        }
 
-        # Boilerplate
-        payload_dict['PayloadVersion'] = 1
-        payload_dict['PayloadUUID'] = makeNewUUID()
-        payload_dict['PayloadEnabled'] = True
+
         payload_dict['PayloadType'] = payload_content_dict['PayloadType']
         payload_dict['PayloadIdentifier'] = f"alacarte.macOS.{baseline_name}.{payload_dict['PayloadUUID']}"
 
@@ -227,12 +222,13 @@ class PayloadDict:
         elements.
         """
         #description = "Configuration settings for the {} preference domain.".format(payload_type)
-        payload_dict = {}
+        payload_dict = {
+            'PayloadVersion': 1,
+            'PayloadUUID': makeNewUUID(),
+            'PayloadEnabled': True,
+        }
 
-        # Boilerplate
-        payload_dict['PayloadVersion'] = 1
-        payload_dict['PayloadUUID'] = makeNewUUID()
-        payload_dict['PayloadEnabled'] = True
+
         payload_dict['PayloadType'] = payload_type
         payload_dict['PayloadIdentifier'] = f"alacarte.macOS.{baseline_name}.{payload_dict['PayloadUUID']}"
 
@@ -251,20 +247,11 @@ class PayloadDict:
         elements.
         """
         keys = settings[1]
-        plist_dict = {}
-        for key in keys.split():
-            plist_dict[key] = settings[2]
-
-        #description = "Configuration settings for the {} preference domain.".format(payload_type)
-        payload_dict = {}
-
+        plist_dict = {key: settings[2] for key in keys.split()}
         state = "Forced"
         domain = settings[0]
 
-        # Boilerplate
-        payload_dict[domain] = {}
-        payload_dict[domain][state] = []
-        payload_dict[domain][state].append({})
+        payload_dict = {domain: {state: [{}]}}
         payload_dict[domain][state][0]['mcx_preference_settings'] = plist_dict
         payload_dict['PayloadType'] = "com.apple.ManagedClient.preferences"
 
@@ -281,14 +268,14 @@ class PayloadDict:
         """
         output_file_path = output_path.name
         preferences_path = os.path.dirname(output_file_path)
-        
+
 
         settings_dict = {}
         for i in self.data['PayloadContent']:
             if i['PayloadType'] == "com.apple.ManagedClient.preferences":
                 for key, value in i['PayloadContent'].items():
                     domain=key
-                    preferences_output_file = os.path.join(preferences_path, domain + ".plist")
+                    preferences_output_file = os.path.join(preferences_path, f"{domain}.plist")
                     if not os.path.exists(preferences_output_file):
                         with open(preferences_output_file, 'w'): pass
                     with open (preferences_output_file, 'rb') as fp:
@@ -300,7 +287,7 @@ class PayloadDict:
                         for setting in value['Forced']:
                             for key, value in setting['mcx_preference_settings'].items():
                                 settings_dict[key] = value
-                    
+
                         #preferences_output_path = open(preferences_output_file, 'wb')
                         plistlib.dump(settings_dict, fp)
                         print(f"Settings plist written to {preferences_output_file}")
@@ -319,7 +306,7 @@ class PayloadDict:
                 for key,value in i.items():
                     if not key.startswith("Payload"):
                         settings_dict[key] = value
-        
+
                 plistlib.dump(settings_dict, output_path)
                 print(f"Settings plist written to {output_path.name}")
             

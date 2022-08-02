@@ -68,21 +68,21 @@ def get_rule_yaml(rule_file, custom=False):
     if custom:
         print(f"Custom settings found for rule: {rule_file}")
         try:
-            override_path = glob.glob('../custom/rules/**/{}'.format(file_name), recursive=True)[0]
+            override_path = glob.glob(f'../custom/rules/**/{file_name}', recursive=True)[0]
         except IndexError:
-            override_path = glob.glob('../custom/rules/{}'.format(file_name), recursive=True)[0]
+            override_path = glob.glob(f'../custom/rules/{file_name}', recursive=True)[0]
         with open(override_path) as r:
             rule_yaml = yaml.load(r, Loader=yaml.SafeLoader)
     else:
         with open(rule_file) as r:
             rule_yaml = yaml.load(r, Loader=yaml.SafeLoader)
-    
+
     try:
-        og_rule_path = glob.glob('../rules/**/{}'.format(file_name), recursive=True)[0]
+        og_rule_path = glob.glob(f'../rules/**/{file_name}', recursive=True)[0]
     except IndexError:
         #assume this is a completely new rule
-        og_rule_path = glob.glob('../custom/rules/**/{}'.format(file_name), recursive=True)[0]
-    
+        og_rule_path = glob.glob(f'../custom/rules/**/{file_name}', recursive=True)[0]
+
     # get original/default rule yaml for comparison
     with open(og_rule_path) as og:
         og_rule_yaml = yaml.load(og, Loader=yaml.SafeLoader)
@@ -95,9 +95,9 @@ def get_rule_yaml(rule_file, custom=False):
             else:
                 resulting_yaml[yaml_field] = rule_yaml[yaml_field]
                 if 'customized' in resulting_yaml:
-                    resulting_yaml['customized'].append("customized {}".format(yaml_field))
+                    resulting_yaml['customized'].append(f"customized {yaml_field}")
                 else:
-                    resulting_yaml['customized'] = ["customized {}".format(yaml_field)]
+                    resulting_yaml['customized'] = [f"customized {yaml_field}"]
         except KeyError:
             resulting_yaml[yaml_field] = og_rule_yaml[yaml_field]
 
@@ -141,7 +141,7 @@ def collect_rules():
                     except:
                         #print("expected reference '{}' is missing in key '{}' for rule{}".format(reference, key, rule))
                         rule_yaml[key].update({reference: ["None"]})
-        
+
         all_rules.append(MacSecurityRule(rule_yaml['title'].replace('|', '\|'),
                                     rule_yaml['id'].replace('|', '\|'),
                                     rule_yaml['severity'].replace('|', '\|'),
@@ -185,10 +185,7 @@ def section_title(section_name):
         "sysprefs": "systempreferences",
         "srg": "srg"
     }
-    if section_name in titles:
-        return titles[section_name]
-    else:
-        return section_name
+    return titles.get(section_name, section_name)
 
 def get_controls(all_rules):
     all_controls = []
@@ -206,9 +203,7 @@ def get_controls(all_rules):
 def available_tags(all_rules):
     all_tags = []
     for rule in all_rules:
-        for tag in rule.rule_tags:
-            all_tags.append(tag)
-
+        all_tags.extend(iter(rule.rule_tags))
     available_tags = []
     for tag in all_tags:
         if tag not in available_tags:
@@ -249,7 +244,7 @@ def output_baseline(rules, os, keyword):
     output_text += f'description: |\n  This guide describes the actions to take when securing a macOS {os} system against the {keyword} baseline.\n'
     output_text += f'authors: |\n  |===\n  |Name|Organization\n  |===\n'
     output_text += 'profile:\n'
-    
+
     # sort the rules
     other_rules.sort()
     inherent_rules.sort()
@@ -257,38 +252,38 @@ def output_baseline(rules, os, keyword):
     na_rules.sort()
     supplemental_rules.sort()
 
-    if len(other_rules) > 0:
+    if other_rules:
         for section in sections:
-            output_text += ('  - section: "{}"\n'.format(section_title(section)))
+            output_text += f'  - section: "{section_title(section)}"\n'
             output_text += ("    rules:\n")
             for rule in other_rules:
                 if rule.startswith(section):
-                    output_text += ("      - {}\n".format(rule))
-    
-    if len(inherent_rules) > 0:
+                    output_text += f"      - {rule}\n"
+
+    if inherent_rules:
         output_text += ('  - section: "Inherent"\n')
         output_text += ("    rules:\n")
         for rule in inherent_rules:
-            output_text += ("      - {}\n".format(rule))
+            output_text += f"      - {rule}\n"
 
-    if len(permanent_rules) > 0:
+    if permanent_rules:
         output_text += ('  - section: "Permanent"\n')
         output_text += ("    rules:\n")
         for rule in permanent_rules:
-            output_text += ("      - {}\n".format(rule))
+            output_text += f"      - {rule}\n"
 
-    if len(na_rules) > 0:
+    if na_rules:
         output_text += ('  - section: "not_applicable"\n')
         output_text += ("    rules: \n")
         for rule in na_rules:
-            output_text += ("      - {}\n".format(rule))
+            output_text += f"      - {rule}\n"
 
-    if len(supplemental_rules) > 0:
+    if supplemental_rules:
         output_text += ('  - section: "Supplemental"\n')
         output_text += ("    rules:\n")
         for rule in supplemental_rules:
-            output_text += ("      - {}\n".format(rule))
-    
+            output_text += f"      - {rule}\n"
+
     return output_text
 
 
@@ -307,7 +302,7 @@ def main():
 
         # switch to the scripts directory
         os.chdir(file_dir)
-    
+
         all_rules = collect_rules()
 
         if args.list_tags:
@@ -321,14 +316,14 @@ def main():
 
             with open(baselines_file) as r:
                 baselines = yaml.load(r, Loader=yaml.SafeLoader)
-            
+
             included_controls = get_controls(all_rules)
             needed_controls = []
-        
+
             for control in baselines['low']:
                 if control not in needed_controls:
                     needed_controls.append(control)
-            
+
             for n_control in needed_controls:
                 if n_control not in included_controls:
                     print(f'{n_control} missing from any rule, needs a rule, or included in supplemental')
@@ -354,11 +349,10 @@ def main():
         if args.keyword in rule.rule_tags or args.keyword == "all_rules":
             found_rules.append(rule)
         # assume all baselines will contain the supplemental rules
-        if "supplemental" in rule.rule_tags:
-            if rule not in found_rules:
-                found_rules.append(rule)
-    
-    if args.keyword == None:
+        if "supplemental" in rule.rule_tags and rule not in found_rules:
+            found_rules.append(rule)
+
+    if args.keyword is None:
         print("No rules found for the keyword provided, please verify from the following list:")
         available_tags(all_rules)
     else:
